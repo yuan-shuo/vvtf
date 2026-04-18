@@ -1,6 +1,22 @@
 <script setup lang="ts">
+import { computed } from 'vue'
+import { useRoute } from 'vue-router'
+import DefaultLayout from './layouts/DefaultLayout.vue'
+import BlankLayout from './layouts/BlankLayout.vue'
+
+const route = useRoute()
+
+const layout = computed(() => {
+  const layoutName = route.meta.layout as string
+  if (layoutName === 'BlankLayout') {
+    return BlankLayout
+  }
+  return DefaultLayout
+})
 </script>
 
 <template>
-  <div></div>
+  <component :is="layout">
+    <router-view />
+  </component>
 </template>
