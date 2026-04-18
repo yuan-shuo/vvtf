@@ -1,10 +1,10 @@
 import type { RouteRecordRaw, RouteComponent } from 'vue-router'
 
 /**
- * 自动导入 pages 目录下的所有页面
+ * 自动导入 pages 目录下的所有页面（排除 404.vue）
  * 文件路径即路由路径
  */
-const pages = import.meta.glob('../pages/**/*.vue', { eager: true })
+const pages = import.meta.glob(['../pages/**/*.vue', '!**/404.vue'], { eager: true })
 
 const routes: RouteRecordRaw[] = []
 
@@ -37,7 +37,7 @@ for (const path in pages) {
   routes.push(route)
 }
 
-// 404 页面
+// 404 页面 - 懒加载
 routes.push({
   path: '/:pathMatch(.*)*',
   name: 'NotFound',
