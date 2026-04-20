@@ -3,7 +3,8 @@ import { ref } from 'vue'
 import { useRouter } from 'vue-router'
 import { resetPassword, sendVerifyCode } from '@/api/user/user'
 import type { ResetPasswordReq, SendVerifyCodeReq } from '@/api/user/userComponents'
-import { handleRequest, isApiError } from '@/api/request'
+import { noauthReq } from '@/api/core/noauthRequest'
+import { isApiError } from '@/api/core/authRequest'
 
 const router = useRouter()
 const email = ref('')
@@ -28,7 +29,7 @@ const handleSendCode = async () => {
       type: 'reset_password'
     }
 
-    const resp = await handleRequest(sendVerifyCode(req))
+    const resp = await noauthReq(sendVerifyCode(req))
 
     alert('验证码已发送')
 
@@ -70,7 +71,7 @@ const handleResetPassword = async () => {
       code: code.value
     }
 
-    await handleRequest(resetPassword(req))
+    await noauthReq(resetPassword(req))
 
     alert('密码重置成功，请登录')
     router.push('/user/login')

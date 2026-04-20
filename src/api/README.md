@@ -1,10 +1,101 @@
-# API 错误处理说明
+# API 请求使用说明
+
+## 目录结构
+
+```
+src/api/
+├── core/                    # 核心请求模块（可修改）
+│   ├── token.ts            # Token 存储、刷新管理
+│   ├── authRequest.ts      # 认证请求包装器（自动携带token）
+│   ├── noauthRequest.ts    # 非认证请求包装器
+│   └── request.ts          # 基础错误处理
+└── user/                    # goctl 生成（不可修改）
+    ├── gocliRequest.ts
+    ├── user.ts             # API 方法
+    └── userComponents.ts   # 类型定义
+```
+
+## 请求用法
+
+### 不需要登录的请求（登录、注册等）
+
+使用 `noauthReq` 包装 goctl 生成的请求方法：
+
+```typescript
+import { noauthReq } from '@/api/core/noauthRequest'
+import { login, register, sendVerifyCode } from '@/api/user/user'
+import { saveTokens } from '@/api/core/token'
+
+// 登录
+const resp = await noauthReq(login({ email, password, rememberMe }))
+saveTokens(resp)  // 保存 token
+
+// 注册
+await noauthReq(register({ email, password, code, nickname }))
+
+// 发送验证码
+await noauthReq(sendVerifyCode({ email, type: 'register' }))
+```
+
+### 需要登录的请求（修改密码等）
+
+使用 `authReq` 包装 goctl 生成的请求方法，**自动携带 token**。
+
+**注意：`authReq` 需要传入工厂函数 `() => apiFunction()`，而不是直接的 Promise：**
+
+```typescript
+import { authReq } from '@/api/core/authRequest'
+import { changePassword } from '@/api/user/user'
+
+// 正确：传入工厂函数
+await authReq(() => changePassword({ oldPassword, newPassword, code }))
+
+// 错误：不要直接传入 Promise
+// await authReq(changePassword({ ... }))  // ❌ 这样 token 不会生效
+```
+
+## 错误处理
+
+统一使用 `isApiError` 判断错误类型：
+
+```typescript
+import { noauthReq, isApiError } from '@/api/core/noauthRequest'
+import { login } from '@/api/user/user'
+
+try {
+    const resp = await noauthReq(login(req))
+} catch (error) {
+    if (isApiError(error)) {
+        // 后端返回的错误：error.code, error.msg
+        alert(error.msg)
+    } else {
+        // 网络错误
+        alert('网络请求失败')
+    }
+}
+```
+
+## Token 管理
+
+```typescript
+import { saveTokens, clearTokens, isLoggedIn, getCurrentUser } from '@/api/core/token'
+
+// 登录后保存 token
+saveTokens(loginResponse)
+
+// 退出登录
+clearTokens()
+
+// 检查登录状态
+if (isLoggedIn()) { ... }
+
+// 获取当前用户信息（从 JWT 解析）
+const user = getCurrentUser()  // { nickname, email, uid, type, iat, exp }
+```
 
 ## 后端响应格式
 
 ### 成功响应 (HTTP 200)
-直接返回数据，无 `code` 和 `msg` 字段：
-
 ```json
 {
   "accessToken": "xxx",
@@ -14,8 +105,6 @@
 ```
 
 ### 错误响应 (HTTP 4xx/5xx)
-返回统一错误格式：
-
 ```json
 {
   "code": 1001,
@@ -30,75 +119,10 @@
 - `1003` - 禁止访问
 - `1004` - 资源不存在
 
-## 前端调用方法
-
-### 基础用法
-使用 `handleRequest` 包装 API 调用：
-
-```typescript
-import { handleRequest, isApiError } from '@/api/request'
-import { login } from '@/api/user/user'
-
-try {
-  const resp = await handleRequest(login(req))
-  // resp 直接是响应数据 { accessToken, refreshToken, expiresIn }
-} catch (error) {
-  if (isApiError(error)) {
-    // error.code - 后端错误码 (number)
-    // error.msg  - 后端错误信息 (string)
-    alert(error.msg)
-  }
-}
-```
-
-### 完整示例
-
-```typescript
-import { ref } from 'vue'
-import { handleRequest, isApiError } from '@/api/request'
-import { login } from '@/api/user/user'
-import type { LoginReq } from '@/api/user/userComponents'
-
-const handleLogin = async () => {
-  try {
-    const req: LoginReq = {
-      email: email.value,
-      password: password.value
-    }
-
-    // 成功时 resp 直接是 LoginResp 类型
-    const resp = await handleRequest(login(req))
-
-    localStorage.setItem('token', resp.accessToken)
-    // ...
-  } catch (error: any) {
-    if (isApiError(error)) {
-      // 后端返回的错误，显示错误信息
-      alert(error.msg)
-      // 可根据 error.code 做特殊处理
-      if (error.code === 1002) {
-        router.push('/login')
-      }
-    } else {
-      // 网络错误或其他异常
-      alert('网络请求失败')
-    }
-  }
-}
-```
-
-## 文件说明
-
-| 文件 | 说明 | 是否可修改 |
-|------|------|-----------|
-| `request.ts` | 通用错误处理封装 | 可修改 |
-| `user/gocliRequest.ts` | goctl 生成，基础请求方法 | **不可修改** |
-| `user/user.ts` | goctl 生成，API 方法 | **不可修改** |
-| `user/userComponents.ts` | goctl 生成，类型定义 | **不可修改** |
-
 ## 注意事项
 
-1. **不要修改 goctl 生成的文件**（`gocliRequest.ts`, `user.ts`, `userComponents.ts`）
-2. 所有 API 错误处理统一通过 `handleRequest` 进行
-3. 使用 `isApiError` 类型守卫判断错误类型
-4. `handleRequest` 会在 `code !== 0` 时抛出 `ApiError`
+1. **不要修改 goctl 生成的文件**（`user/` 目录下）
+2. `noauthReq` 直接传入 Promise：`noauthReq(apiFunction())`
+3. **`authReq` 必须传入工厂函数：`authReq(() => apiFunction())`**
+4. `authReq` 会自动处理 token 刷新，无需手动处理
+5. Token 存储在 localStorage 中

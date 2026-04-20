@@ -1,24 +1,27 @@
 <script setup lang="ts">
 import { ref } from 'vue'
 import { useRouter } from 'vue-router'
-import { register, sendVerifyCode } from '@/api/user/user'
-import type { RegisterReq, SendVerifyCodeReq } from '@/api/user/userComponents'
+import { changePassword, sendVerifyCode } from '@/api/user/user'
+import type { ChangePasswordReq, SendVerifyCodeReq } from '@/api/user/userComponents'
+import { authReq } from '@/api/core/authRequest'
 import { noauthReq } from '@/api/core/noauthRequest'
 import { isApiError } from '@/api/core/authRequest'
+import { getCurrentUser, clearTokens } from '@/api/core/token'
 
 const router = useRouter()
-const email = ref('')
-const password = ref('')
+const oldPassword = ref('')
+const newPassword = ref('')
 const confirmPassword = ref('')
 const code = ref('')
-const nickname = ref('')
 const loading = ref(false)
 const sendingCode = ref(false)
 const countdown = ref(0)
 
+const user = getCurrentUser()
+
 const handleSendCode = async () => {
-  if (!email.value) {
-    alert('请输入邮箱')
+  if (!user?.email) {
+    alert('无法获取用户邮箱')
     return
   }
 
@@ -26,8 +29,8 @@ const handleSendCode = async () => {
 
   try {
     const req: SendVerifyCodeReq = {
-      email: email.value,
-      type: 'register'
+      email: user.email,
+      type: 'change_password'
     }
 
     const resp = await noauthReq(sendVerifyCode(req))
@@ -52,36 +55,37 @@ const handleSendCode = async () => {
   }
 }
 
-const handleRegister = async () => {
-  if (!email.value || !password.value || !code.value || !nickname.value) {
+const handleChangePassword = async () => {
+  if (!oldPassword.value || !newPassword.value || !code.value) {
     alert('请填写所有必填项')
     return
   }
 
-  if (password.value !== confirmPassword.value) {
-    alert('两次输入的密码不一致')
+  if (newPassword.value !== confirmPassword.value) {
+    alert('两次输入的新密码不一致')
     return
   }
 
   loading.value = true
 
   try {
-    const req: RegisterReq = {
-      email: email.value,
-      password: password.value,
-      code: code.value,
-      nickname: nickname.value
+    const req: ChangePasswordReq = {
+      oldPassword: oldPassword.value,
+      newPassword: newPassword.value,
+      code: code.value
     }
 
-    await noauthReq(register(req))
+    await authReq(() => changePassword(req))
 
-    alert('注册成功，请登录')
+    clearTokens()
+    alert('密码修改成功，请重新登录')
+    
     router.push('/user/login')
   } catch (error: any) {
     if (isApiError(error)) {
       alert(error.msg)
     } else {
-      alert('注册失败，请稍后重试')
+      alert('密码修改失败，请稍后重试')
     }
   } finally {
     loading.value = false
@@ -91,13 +95,19 @@ const handleRegister = async () => {
 
 <template>
   <div>
-    <h1>注册</h1>
-    <form @submit.prevent="handleRegister">
+    <h1>修改密码</h1>
+    <div v-if="user">
+      <p>邮箱: {{ user.email }}</p>
+    </div>
+    <form @submit.prevent="handleChangePassword">
       <div>
-        <input v-model="nickname" type="text" placeholder="昵称" />
+        <input v-model="oldPassword" type="password" placeholder="旧密码" />
       </div>
       <div>
-        <input v-model="email" type="email" placeholder="邮箱" />
+        <input v-model="newPassword" type="password" placeholder="新密码" />
+      </div>
+      <div>
+        <input v-model="confirmPassword" type="password" placeholder="确认新密码" />
       </div>
       <div>
         <input v-model="code" type="text" placeholder="验证码" />
@@ -105,18 +115,12 @@ const handleRegister = async () => {
           {{ countdown > 0 ? `${countdown}秒后重试` : '发送验证码' }}
         </button>
       </div>
-      <div>
-        <input v-model="password" type="password" placeholder="密码" />
-      </div>
-      <div>
-        <input v-model="confirmPassword" type="password" placeholder="确认密码" />
-      </div>
       <button type="submit" :disabled="loading">
-        {{ loading ? '注册中...' : '注册' }}
+        {{ loading ? '修改中...' : '修改密码' }}
       </button>
     </form>
     <div>
-      <router-link to="/user/login">已有账号？去登录</router-link>
+      <router-link to="/user">返回个人中心</router-link>
     </div>
   </div>
 </template>
@@ -125,7 +129,7 @@ const handleRegister = async () => {
 {
   "meta": {
     "layout": "BlankLayout",
-    "title": "注册"
+    "title": "修改密码"
   }
 }
 </route>

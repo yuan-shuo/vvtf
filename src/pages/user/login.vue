@@ -3,7 +3,9 @@ import { ref } from 'vue'
 import { useRouter } from 'vue-router'
 import { login } from '@/api/user/user'
 import type { LoginReq } from '@/api/user/userComponents'
-import { handleRequest, isApiError } from '@/api/request'
+import { noauthReq } from '@/api/core/noauthRequest'
+import { isApiError } from '@/api/core/authRequest'
+import { saveTokens } from '@/api/core/token'
 
 const router = useRouter()
 const email = ref('')
@@ -26,13 +28,9 @@ const handleLogin = async () => {
       rememberMe: rememberMe.value
     }
 
-    const resp = await handleRequest(login(req))
+    const resp = await noauthReq(login(req))
 
-    localStorage.setItem('token', resp.accessToken)
-    if (resp.refreshToken) {
-      localStorage.setItem('refreshToken', resp.refreshToken)
-    }
-    localStorage.setItem('tokenExpires', String(Date.now() + resp.expiresIn * 1000))
+    saveTokens(resp)
 
     router.push('/')
   } catch (error: any) {
