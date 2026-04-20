@@ -67,6 +67,11 @@ const handleLogin = async () => {
         {{ loading ? '登录中...' : '登录' }}
       </button>
     </form>
+    <div>
+      <router-link to="/user/register">注册账号</router-link>
+      <span> | </span>
+      <router-link to="/user/reset-password">忘记密码</router-link>
+    </div>
   </div>
 </template>
 

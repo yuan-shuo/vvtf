@@ -7,7 +7,8 @@ export async function handleRequest<T>(promise: Promise<T>): Promise<T> {
     const result = await promise as any
 
     // 处理业务错误（code 不为 0 或 undefined）
-    if (result.code !== undefined && result.code !== 0) {
+    // 注意：null 和 {} 没有 code 字段，应该视为成功
+    if (result && typeof result === 'object' && 'code' in result && result.code !== 0) {
         const error = new Error(result.msg || '请求失败') as ApiError
         error.code = result.code
         error.msg = result.msg || '请求失败'
