@@ -46,3 +46,44 @@ jobs:
         
       # - name: 构建验证
       #   run: pnpm build
+
+      - name: 检查禁止修改的文件
+        run: |
+          # 获取修改的文件列表和状态
+          if [ "${{ github.event_name }}" = "pull_request" ]; then
+            # PR 模式
+            git fetch origin ${{ github.base_ref }} --depth=1
+            FILE_STATUS=$(git diff --name-status origin/${{ github.base_ref }}..HEAD)
+          else
+            # Push 模式
+            BEFORE=${{ github.event.before }}
+            AFTER=${{ github.event.after }}
+            
+            if [ "$BEFORE" = "0000000000000000000000000000000000000000" ]; then
+              # 首次提交：使用 git show 获取所有文件
+              FILE_STATUS=$(git show --name-status --format=format: $AFTER | tail -n +2)
+            else
+              FILE_STATUS=$(git diff --name-status $BEFORE $AFTER)
+            fi
+          fi
+
+          # 如果没有文件变更，直接通过
+          if [ -z "$FILE_STATUS" ]; then
+            echo "✅ 没有文件变更，检查通过"
+            exit 0
+          fi
+
+          # 检查 src/api 下除 core 外的修改(M)和删除(D)操作
+          FORBIDDEN_CHANGES=$(echo "$FILE_STATUS" | grep -E '^[MD]\s+src/api/' | grep -v 'src/api/core/' || true)
+
+          if [ -n "$FORBIDDEN_CHANGES" ]; then
+            echo "❌ 错误：检测到对 src/api 下非 core 目录的修改或删除："
+            echo "$FORBIDDEN_CHANGES"
+            echo ""
+            echo "goctl 生成的文件不应该手动修改或删除。"
+            echo "如需更新 API 代码，请重新执行 goctl 生成。"
+            echo "如需修改 API 逻辑，请在 src/api/core/ 目录下进行。"
+            exit 1
+          fi
+
+          echo "✅ 文件检查通过"
