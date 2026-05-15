@@ -7,7 +7,7 @@ export * from "./userComponents"
  * @param req
  */
 export function changePassword(req: components.ChangePasswordReq) {
-	return webapi.post<components.ChangePasswordResp>(`/api/account/v1/changepassword`, req)
+	return webapi.post<components.ChangePasswordResp>(`/api/user/v1/changepassword`, req)
 }
 
 /**
@@ -15,7 +15,7 @@ export function changePassword(req: components.ChangePasswordReq) {
  * @param req
  */
 export function login(req: components.LoginReq) {
-	return webapi.post<components.LoginResp>(`/api/account/v1/noauth/login`, req)
+	return webapi.post<components.LoginResp>(`/api/user/v1/noauth/login`, req)
 }
 
 /**
@@ -23,7 +23,7 @@ export function login(req: components.LoginReq) {
  * @param req
  */
 export function register(req: components.RegisterReq) {
-	return webapi.post<components.RegisterResp>(`/api/account/v1/noauth/register`, req)
+	return webapi.post<components.RegisterResp>(`/api/user/v1/noauth/register`, req)
 }
 
 /**
@@ -31,7 +31,7 @@ export function register(req: components.RegisterReq) {
  * @param req
  */
 export function resetPassword(req: components.ResetPasswordReq) {
-	return webapi.post<components.ResetPasswordResp>(`/api/account/v1/noauth/resetpassword`, req)
+	return webapi.post<components.ResetPasswordResp>(`/api/user/v1/noauth/resetpassword`, req)
 }
 
 /**
@@ -39,7 +39,7 @@ export function resetPassword(req: components.ResetPasswordReq) {
  * @param req
  */
 export function sendVerifyCode(req: components.SendVerifyCodeReq) {
-	return webapi.post<components.SendVerifyCodeResp>(`/api/account/v1/noauth/verifycode`, req)
+	return webapi.post<components.SendVerifyCodeResp>(`/api/user/v1/noauth/verifycode`, req)
 }
 
 /**
@@ -47,5 +47,5 @@ export function sendVerifyCode(req: components.SendVerifyCodeReq) {
  * @param req
  */
 export function refreshToken(req: components.RefreshTokenReq) {
-	return webapi.post<components.RefreshTokenResp>(`/api/account/v1/noauth/refreshtoken`, req)
+	return webapi.post<components.RefreshTokenResp>(`/api/user/v1/noauth/refreshtoken`, req)
 }
