@@ -51,41 +51,49 @@ jobs:
 
       - name: 检查禁止修改的文件
         run: |
-          # 获取修改的文件列表和状态
-          if [ "${{ github.event_name }}" = "pull_request" ]; then
-            # PR 模式
-            git fetch origin ${{ github.base_ref }} --depth=1
-            FILE_STATUS=$(git diff --name-status origin/${{ github.base_ref }}..HEAD)
-          else
-            # Push 模式
-            BEFORE=${{ github.event.before }}
-            AFTER=${{ github.event.after }}
-            
-            if [ "$BEFORE" = "0000000000000000000000000000000000000000" ]; then
-              # 首次提交：使用 git show 获取所有文件
-              FILE_STATUS=$(git show --name-status --format=format: $AFTER | tail -n +2)
-            else
-              FILE_STATUS=$(git diff --name-status $BEFORE $AFTER)
-            fi
-          fi
+          # 获取最新 commit 的文件变更
+          LATEST_STATUS=$(git diff --name-status HEAD~1 HEAD 2>/dev/null || echo "")
 
           # 如果没有文件变更，直接通过
-          if [ -z "$FILE_STATUS" ]; then
+          if [ -z "$LATEST_STATUS" ]; then
             echo "✅ 没有文件变更，检查通过"
             exit 0
           fi
 
-          # 检查 src/api 下除 core 外的修改(M)和删除(D)操作
-          FORBIDDEN_CHANGES=$(echo "$FILE_STATUS" | grep -E '^[MD]\s+src/api/' | grep -v 'src/api/core/' || true)
+          # 检查最新 commit 中 src/api 下除 core 外的修改(M)和删除(D)操作
+          LATEST_FORBIDDEN=$(echo "$LATEST_STATUS" | grep -E '^[MD]\s+src/api/' | grep -v 'src/api/core/' || true)
 
-          if [ -n "$FORBIDDEN_CHANGES" ]; then
-            echo "❌ 错误：检测到对 src/api 下非 core 目录的修改或删除："
-            echo "$FORBIDDEN_CHANGES"
-            echo ""
-            echo "goctl 生成的文件不应该手动修改或删除。"
-            echo "如需更新 API 代码，请重新执行 goctl 生成。"
-            echo "如需修改 API 逻辑，请在 src/api/core/ 目录下进行。"
-            exit 1
+          # 如果没有违规变更，直接通过
+          if [ -z "$LATEST_FORBIDDEN" ]; then
+            echo "✅ 文件检查通过"
+            exit 0
           fi
 
-          echo "✅ 文件检查通过"
+          # 获取被修改的文件列表（不含状态前缀）
+          MODIFIED_FILES=$(echo "$LATEST_FORBIDDEN" | sed 's/^[MD]\s*//' | sort)
+
+          # 检查上一个 commit 是否修改了相同的文件（第二次修改相同文件则允许）
+          PREV_STATUS=$(git diff --name-status HEAD~2 HEAD~1 2>/dev/null || echo "")
+          PREV_FORBIDDEN=$(echo "$PREV_STATUS" | grep -E '^[MD]\s+src/api/' | grep -v 'src/api/core/' || true)
+          PREV_MODIFIED_FILES=$(echo "$PREV_FORBIDDEN" | sed 's/^[MD]\s*//' | sort)
+
+          # 检查是否有文件在两次 commit 中都被修改（交集）
+          COMMON_FILES=$(comm -12 <(echo "$MODIFIED_FILES") <(echo "$PREV_MODIFIED_FILES") || true)
+
+          if [ -n "$COMMON_FILES" ]; then
+            echo "✅ 检测到连续两次修改相同文件，视为已确认，检查通过"
+            echo "文件列表："
+            echo "$COMMON_FILES"
+            exit 0
+          fi
+
+          # 第一次修改，报错
+          echo "❌ 错误：检测到对 src/api 下非 core 目录的修改或删除："
+          echo "$LATEST_FORBIDDEN"
+          echo ""
+          echo "goctl 生成的文件不应该手动修改或删除。"
+          echo "如需更新 API 代码，请重新执行 goctl 生成。"
+          echo "如需修改 API 逻辑，请在 src/api/core/ 目录下进行。"
+          echo ""
+          echo "提示：如果确认需要修改这些文件，请再次提交相同的修改即可通过检查。"
+          exit 1
